@@ -19,6 +19,7 @@
 #include "commands/createas.h"
 #include "commands/defrem.h"
 #include "commands/prepare.h"
+#include "commands/yb_qualstats.h"
 #include "executor/nodeHash.h"
 #include "foreign/fdwapi.h"
 #include "jit/jit.h"
@@ -198,6 +199,10 @@ ExplainQuery(ParseState *pstate, ExplainStmt *stmt, const char *queryString,
 						 errmsg("unrecognized value for EXPLAIN option \"%s\": \"%s\"",
 								opt->defname, p),
 						 parser_errposition(pstate, opt->location)));
+		}
+		else if (strcmp(opt->defname, "indexadvisor") == 0 && IsYugaByteEnabled())
+		{
+			es->yb_indexadvisor = defGetBoolean(opt);
 		}
 		else
 			ereport(ERROR,
@@ -588,6 +593,13 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	 */
 	if (es->costs)
 		ExplainPrintJITSummary(es, queryDesc);
+
+
+	/*
+	* Qualstats addition
+	*/
+	if (es->yb_indexadvisor)
+		yb_advisor(es, queryDesc);
 
 	/*
 	 * Close down the query and free resources.  Include time for this in the
